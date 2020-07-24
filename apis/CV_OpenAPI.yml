@@ -1,0 +1,325 @@
+openapi: 3.0.2
+info:
+  title: CV server
+  description: Server for CV apps
+  termsOfService: http://guillaume.maiano.fr/terms/
+  contact:
+    name: Guillaume Maiano
+    url: https://guillaume.maiano.fr
+    email: guillaume@maiano.fr
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+    # I'm no legal expert, but I think Apache 2.0 is fine for me.
+  version: "1.0"
+paths:
+  /v1/person/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          description: User ID *provided by the server*
+          required: true
+          style: simple
+          explode: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: details of user
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/User"
+        404:
+          description: Not found
+
+  /v1/skills/{userId}:
+    get:
+      parameters:
+        - name: userId
+          in: path
+          description: User ID *provided by the server* for the requested list of skills
+          required: true
+          style: simple
+          explode: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: skills of user
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Skill"
+        404:
+          description: Not found
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        # - OpenID:
+        #   - read
+        - JWT: []
+
+  /v1/users:
+    get:
+      parameters:
+        - name: pageNumber
+          in: query
+          description: Page Number
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: integer
+            format: int32
+            default: 1
+        - name: pageSize
+          in: query
+          description: optional page size for the paged list of users
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: integer
+            format: int32
+            default: 10
+      responses:
+        200:
+          description: List of users
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersPagedList'
+servers:
+- url: https://cv.maiano.fr
+  description: Production Server
+components:
+  schemas:
+    UsersPagedList:
+      type: object
+      properties: 
+        content: 
+           $ref: '#/components/schemas/UsersList'
+      allOf:
+      - $ref: '#/components/schemas/PagedResponse'
+    UsersList:
+      maxItems: 10
+      minItems: 1
+      type: array
+      description: List of Users
+      items:
+        $ref: "#/components/schemas/User"
+    
+    Skill:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        name: 
+          type: string
+          minLength: 1
+          maxLength: 256
+          example: SCRUM Master
+    
+    Experience:
+      type: object
+      description: time spent honing a skill
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        duration: 
+          type: integer 
+          format: int32
+          description: Unix duration for the experience in that skill (no sense in using int64 for an experience... we're not tracking the Chinese Empire's achievements)
+          nullable: true
+        timespan:
+          type: object
+          properties:
+            dates:
+              $ref: "#components/schemas/TimeSpan"
+          nullable: true
+          description: a timespan, if the duration is non contiguous. **Should only be null if *duration* is not!**
+
+    TimeSpan:
+      type: object
+      description: a time span from a start date to an end date within the UNIX32 world (ends in 2038).
+      properties:
+        startDate:
+          type: string
+          format: date
+          description: the beginning of the timespan
+        endDate:
+          type: string
+          format: date
+          description: the end of the timespan (for example, gaining experience with a skill)
+
+    User:
+    # Identifying people is one of the most complex things imaginable
+    # This is a simple model for our simple needs. 
+    # IRL, people might not have a family name, a first name, not identify (even legally, as in the NL) with a specific gender...
+    # they might even not know their own birthdate. Complex world, simple system. Mismatch.
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          example: Maiano-Maggio
+        firstName:
+          type: string
+          example: Guillaume
+        birthDate:
+          type: string
+          format: date
+        # Fact: there is a standard for addressing, UPU-S42
+        # It's based on "every country builds their part"...
+        # http://www.upu.int/en/activities/addressing/s42-standard.html
+        # The truth is, it's rather imprecise because locations don't fit as precisely as one would think
+        # LESVEN, BRELES, FRANCE was a valid address for decades (though the French Post Office standardized it now to "number, place, postcode, city" format)
+        # Théodore Malgorn, Phare de la Jument, France was also a valid address (till 1991) - The modern address has been standardized to 1, Roche de la Jument Men Ar Gazec, 29242 Ouessant 
+        # Note how the modern address contains two languages, since Men Ar Gazec is the valid name for that location in Bretagne in Breton, the local language.
+        # Many countries aren't in a situation to have yet standardized their address system
+        # Some addresses can be very specific, such as military personnel
+        # Some include the floor and door, as in the fictional: Appt 20, level 220, Burj Dubai, Dubai
+        # However, this is *way* outside of the scope here
+        # Therefore, we shall simply choose to allow a possible number, a possible "place" (which could be a street, a plaza, a castle or a lieu-dit), an obligatory city and postcode and a country
+        address:
+          type: object
+          properties:
+            content:
+              $ref: "#/components/schemas/Address"
+        # Despite the imperfections due to real life:
+        # https://en.wikipedia.org/wiki/ISO_3166-1#Naming_and_disputes
+        # ISO 3166 is relatively reliable to identify nationality, it even defines nationality-less people: XXA, XXB, XXC and XXD codes
+        # https://www.iso.org/obp/ui/#search (409 codes total)
+        nationality:
+          type: string
+          minLength: 2
+          maxLength: 3
+          description: ISO 3166 three-letter codes
+    Address:
+      type: object
+      properties:
+        number:
+          type: number
+          format: integer
+          description: a possible number identifying the specific sublocation
+          nullable: true
+        place:
+          type: string
+          description: a possible place, which may include floor, location type or name, or even region/oblast/state
+          nullable: true
+          example: 
+            Appt 3, 5th Floor, Lone Tower, Godforsaken Region
+        postcode:
+          type: string
+          description: a possible postcode. The variation in postcode schemes is not negligible (2021ER is a valid Dutch postcode, 101103 is a valid russian postcode, 59800 is a valid French postcode...)
+          nullable: false # we choose to make this non nullable, but it is a simplification of reality
+          example: 
+            245001 # a postcode in Huangshan, China
+        city:
+          type: string
+          description: a city name
+          nullable: false # we also choose to make this non nullable, but it is another simplification of reality
+          example: 
+            Dar Es Salaam
+        country:
+          type: string
+          minLength: 1
+          maxLength: 100 # 
+          description: a country name (not a ISO 3166 code)
+          nullable: false # another choice, though, apart from the rare space station I fail to see what doesn't have a country... Even Antartica fits the bill...
+          example: 
+            ایران # I wonder how RTL reacts to being typed in YAML
+    PagedResponse:
+      type: object
+      properties:
+        pageable:
+          $ref: '#/components/schemas/PagedResponse_pageable'
+        totalPages:
+          type: integer
+          format: int32
+        last:
+          type: boolean
+        totalElements:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        sort:
+          $ref: '#/components/schemas/PagedResponse_pageable_sort'
+        first:
+          type: boolean
+    PagedResponse_pageable_sort:
+      type: object
+      properties:
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
+    PagedResponse_pageable:
+      type: object
+      properties:
+        sort:
+          $ref: '#/components/schemas/PagedResponse_pageable_sort'
+        offset:
+          type: integer
+          format: int32
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        paged:
+          type: boolean
+        unpaged:
+          type: boolean
+
+  responses:
+   UnauthorizedError:
+     description: Access token is missing or invalid
+
+  securitySchemes:
+    BasicAuth: # the name is for humans, could actually be "dumdum" as well...
+      type: http
+      scheme: basic # this is what matters
+
+    JWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT # arbitrary value for documentation
+    
+    # OpenID:
+    #   type: oauth2
+    #   description: Probably not a good idea, very complex I'm told
+    #   flows:
+    #     authorizationCode:
+    #       authorizationUrl: https://maiano.fr/oauth/authorize # should I use Apple Connect, and how?
+    #       tokenUrl: https://maiano.fr/oauth/token
+    #       refreshUrl: https://maiano.fr/oauth/refresh
+    #       scopes:
+    #         read: Grants read access
+    #         write: Grants write access including delete
+    #         # some kind of admin scope needed?
+
+security:
+  - BasicAuth: []
+  # Overriden as needed, but I just don't want any scammer to request stuff from my servers
+  # Interesting that we can do (A and B) or (C and D) as security schemes

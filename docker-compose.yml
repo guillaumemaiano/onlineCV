@@ -1,0 +1,29 @@
+version: '3.0'
+services:
+# apache the openapi yaml
+  yaml-expose:
+    ports: 
+      - "81:80"
+    image: httpd:2.4
+    container_name: api-debug-tool
+    volumes:
+      - ".:/usr/local/apache2/htdocs/"
+# run the swagger tool
+  swagger-ui:
+    ports: 
+      - "80:8080"
+    image: swaggerapi/swagger-ui
+    container_name: swagger-ui-tool
+    environment:
+      - BASE_URL=/swagger
+      - SWAGGER_JSON=/api/CV_OpenAPI.yml
+      - API_URL=CV_OpenAPI.yml
+    restart: always
+    volumes:
+      - "./apis/:/api"
+
+  # SetEnvIf Referer "^https://localhost\/.*$" request-swagger
+  # Header set Access-Control-Allow-Origin "localhost" env=request-swagger
+  # RewriteCond "%{HTTP_HOST}" "^localhost"
+  # RewriteCond "%{REQUEST_METHOD}" =OPTIONS
+  # RewriteRule "^.*$" - [R=200]
