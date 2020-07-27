@@ -63,6 +63,37 @@ paths:
         #   - read
         - JWT: []
 
+  /v1/missions:
+    get:
+      parameters:
+        - name: pageNumber
+          in: query
+          description: Page Number
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: integer
+            format: int32
+            default: 1
+        - name: pageSize
+          in: query
+          description: optional page size for the paged list of missions
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: integer
+            format: int32
+            default: 5
+      responses:
+        200:
+          description: List of missions
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissionsPagedList'
+  
   /v1/users:
     get:
       parameters:
@@ -96,8 +127,27 @@ paths:
 servers:
 - url: https://cv.maiano.fr
   description: Production Server
+- url: http://localhost:82
+  description: Development server (Docker)
 components:
   schemas:
+
+    MissionsPagedList:
+      type: object
+      properties: 
+        content: 
+           $ref: '#/components/schemas/MissionsList'
+      allOf:
+      - $ref: '#/components/schemas/PagedResponse'
+
+    MissionsList:
+      maxItems: 25
+      minItems: 1
+      type: array
+      description: List of Missions
+      items:
+        $ref: "#/components/schemas/Mission"
+
     UsersPagedList:
       type: object
       properties: 
@@ -113,6 +163,74 @@ components:
       items:
         $ref: "#/components/schemas/User"
     
+    # Formation & Education
+    Training:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        name:
+          type: string
+          example: Cool online webcamp
+        url:
+          type: string
+          format: url
+          example: "https://cooltraining.example.com"
+          nullable: true
+        dates:
+          type: object
+          nullable: true
+          properties:
+            content:
+              $ref: "#/components/schemas/"#/components/schemas/TimeSpan"
+    
+    Mission:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        employer:
+          type: object
+          properties:
+            content:
+              $ref: "#/components/schemas/Employer"
+        resume:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        dates:
+          type: object
+          properties:
+            content:
+              $ref: "#/components/schemas/"#/components/schemas/TimeSpan"
+        skills:
+          type: array
+          items:
+            type: object
+            properties:
+              content:
+                $ref: "#/components/schemas/Skill"
+    Employer:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+        name:
+          type: string
+          description: a name identifying a moral or physical person
+        url:
+          type: string
+          format: url
+          # swagger.io states format is an open value and this is correct usage. However, URL is not part of the standard!
+          description: an url to a website for the employer
+          nullable: true
+
     Skill:
       type: object
       properties:
@@ -125,7 +243,7 @@ components:
           minLength: 1
           maxLength: 256
           example: SCRUM Master
-    
+  
     Experience:
       type: object
       description: time spent honing a skill
@@ -138,14 +256,33 @@ components:
           type: integer 
           format: int32
           description: Unix duration for the experience in that skill (no sense in using int64 for an experience... we're not tracking the Chinese Empire's achievements)
-          nullable: true
+          nullable: false
+        skill:
+          type: object
+          properties:
+            content:
+              $ref: "#components/schemas/Skill"
+
+    Practice:
+      type: object
+      description: timespan during which a given skill was practiced
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true  
         timespan:
           type: object
           properties:
             dates:
               $ref: "#components/schemas/TimeSpan"
           nullable: true
-          description: a timespan, if the duration is non contiguous. **Should only be null if *duration* is not!**
+          description: a timespan
+        skill:
+          type: object
+          properties:
+            content:
+              $ref: "#components/schemas/Skill"
 
     TimeSpan:
       type: object
@@ -206,6 +343,7 @@ components:
           minLength: 2
           maxLength: 3
           description: ISO 3166 three-letter codes
+          example: USA
     Address:
       type: object
       properties:
