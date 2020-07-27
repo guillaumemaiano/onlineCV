@@ -4,10 +4,10 @@ services:
   yaml-expose:
     ports: 
       - "81:80"
-    image: httpd:2.4
+    build: './Dockerfiles/YAML'
     container_name: api-debug-tool
     volumes:
-      - ".:/usr/local/apache2/htdocs/"
+      - "./apis:/usr/local/apache2/htdocs/"
 # run the swagger tool
   swagger-ui:
     ports: 
@@ -21,9 +21,4 @@ services:
     restart: always
     volumes:
       - "./apis/:/api"
-
-  # SetEnvIf Referer "^https://localhost\/.*$" request-swagger
-  # Header set Access-Control-Allow-Origin "localhost" env=request-swagger
-  # RewriteCond "%{HTTP_HOST}" "^localhost"
-  # RewriteCond "%{REQUEST_METHOD}" =OPTIONS
-  # RewriteRule "^.*$" - [R=200]
+    # the /etc/nginx/cors.conf file is interesting
