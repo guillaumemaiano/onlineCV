@@ -53,7 +53,7 @@ paths:
           content:
             application/json:
               schema: 
-                $ref: "#/components/schemas/Skill"
+                $ref: "#/components/schemas/SkillsList"
         404:
           description: Not found
         401:
@@ -63,9 +63,46 @@ paths:
         #   - read
         - JWT: []
 
-  /v1/missions:
+  /v1/books/{userId}:
     get:
       parameters:
+        - name: bookId
+          in: path
+          description: User ID *provided by the server*
+          required: true
+          style: simple
+          explode: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: books read by user
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Books"
+        404:
+          description: Not found
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+      security:
+        # - OpenID:
+        #   - read
+        - JWT: []
+
+  /v1/missions/{userId}:
+    get:
+      parameters:
+        - name: userId
+          in: path
+          description: User ID *provided by the server* for the requested list of missions
+          required: true
+          style: simple
+          explode: true
+          schema:
+            type: string
+            format: uuid
         - name: pageNumber
           in: query
           description: Page Number
@@ -87,13 +124,76 @@ paths:
             format: int32
             default: 5
       responses:
+        404:
+          description: Not found
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
         200:
           description: List of missions
           content: 
             application/json:
               schema:
                 $ref: '#/components/schemas/MissionsPagedList'
-  
+
+  /v1/skillXP/{userId}/{skillId}:
+    get:
+      description: List of all Practices (relevant experiences) for the skill, and the total Experience if appropriate
+      parameters:
+        - name: userId
+          in: path
+          description: User ID *provided by the server* for the requested list of skill experiences
+          required: true
+          style: simple
+          explode: true
+          schema:
+            type: string
+            format: uuid
+        - name: skillId
+          in: path
+          description: Skill ID *provided by the server* for the requested list of skill experiences
+          required: true
+          style: simple
+          explode: true
+          schema:
+            type: string
+            format: int32
+      responses:
+        404:
+          description: Not found
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        200:
+          description: List of Skill experiences
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillXPList'
+
+  /v1/training/{userId}:
+    get:
+      description: List of all Training the user attended
+      parameters:
+        - name: userId
+          in: path
+          description: User ID *provided by the server* (training are user specific)
+          required: true
+          style: simple
+          explode: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        404:
+          description: Not found
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        200:
+          description: List of Skill experiences
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingList'
+
   /v1/users:
     get:
       parameters:
@@ -162,6 +262,62 @@ components:
       description: List of Users
       items:
         $ref: "#/components/schemas/User"
+    
+    TrainingList:
+    # I'd assume 500 trainings to cover academics and online training...
+      maxItems: 500
+      minItems: 0
+      type: array
+      description: List of Training
+      items:
+        $ref: "#/components/schemas/Training"
+
+    SkillXPList:
+      maxItems: 800
+      minItems: 0
+      type: array
+      description: a list with practice duration and spans
+      items:
+        anyOf:
+          - $ref:  "#/components/schemas/Practice"
+          - $ref: "#/components/schemas/Experience"
+
+    Books:
+    # 200 professional books being still relevant seems really huge
+      maxItems: 200
+      minItems: 0
+      type: array
+      description: list of books pertaining to the user professional fields
+      items:
+        $ref: "#/components/schemas/Book"
+
+    Book:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+          readOnly: true
+          example: 21
+        title:
+          type: string
+          example: A hilarious Brexit story
+        author:
+          type: string
+          example: RS Archer
+        ISBN:
+          type: string
+          format: ISBN
+          example: 978-3-16-148410-0
+        description:
+          type: string
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 2000
+        favorited:
+          type: boolean
+    # I should extend the API with a "writings" category for tech blog posts etc...
     
     # Formation & Education
     Training:
@@ -261,7 +417,7 @@ components:
           type: object
           properties:
             content:
-              $ref: "#components/schemas/Skill"
+              $ref: "#/components/schemas/Skill"
 
     Practice:
       type: object
@@ -275,14 +431,14 @@ components:
           type: object
           properties:
             dates:
-              $ref: "#components/schemas/TimeSpan"
+              $ref: "#/components/schemas/TimeSpan"
           nullable: true
           description: a timespan
         skill:
           type: object
           properties:
             content:
-              $ref: "#components/schemas/Skill"
+              $ref: "#/components/schemas/Skill"
 
     TimeSpan:
       type: object
